@@ -2,7 +2,7 @@ import React, { useState, useRef } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { motion } from 'framer-motion';
 import { useMemories } from '../hooks/useMemories';
-import { ArrowLeft, Save, Image as ImageIcon, Mic, FileText, Clock } from 'lucide-react';
+import { ArrowLeft, Save, Image as ImageIcon, Mic, FileText, Clock, Lock } from 'lucide-react';
 import toast from 'react-hot-toast';
 
 const AddMemory = () => {
