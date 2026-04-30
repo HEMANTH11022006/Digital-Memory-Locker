@@ -1,21 +1,29 @@
 import { useState, useEffect } from 'react';
 import { encryptData, decryptData } from '../utils/encryption';
 import { useAuth } from './AuthContext';
+import { storage, db } from '../firebase/config';
+import { ref, uploadBytes, getDownloadURL } from 'firebase/storage';
+import { doc, setDoc, collection } from 'firebase/firestore';
 
 export const useMemories = () => {
-  const [memories, setMemories] = useState([]);
   const { user } = useAuth();
 
+  const [memories, setMemories] = useState(() => {
+    if (user) {
+      const stored = localStorage.getItem(`memories_${user.uid}`);
+      return stored ? JSON.parse(stored) : [];
+    }
+    return [];
+  });
+
   useEffect(() => {
-    if (!user) return;
-    // Load from local storage for demo
-    // In production: listen to Firestore collection 'memories' where uid === user.uid
+    if (!user) {
+      setMemories([]);
+      return;
+    }
     const stored = localStorage.getItem(`memories_${user.uid}`);
     if (stored) {
       const encryptedArray = JSON.parse(stored);
-      // We don't decrypt immediately to show the "unlock" feature later
-      // But for dashboard, we might need metadata. 
-      // Usually, metadata is unencrypted, content is encrypted.
       setMemories(encryptedArray);
     }
   }, [user]);
@@ -27,18 +35,58 @@ export const useMemories = () => {
     }
   };
 
-  const addMemory = (memory) => {
+  const addMemory = async (memory) => {
+    let audioUrl = null;
+
+    if (memory.audioBlob) {
+      if (storage) {
+        try {
+          const fileRef = ref(storage, `audio/${user.uid}/${Date.now()}.webm`);
+          const snapshot = await uploadBytes(fileRef, memory.audioBlob);
+          audioUrl = await getDownloadURL(snapshot.ref);
+        } catch (error) {
+          console.warn("Firebase Storage error, falling back to base64:", error);
+          // Fallback if user hasn't configured Firebase properly
+          const reader = new FileReader();
+          audioUrl = await new Promise((resolve) => {
+            reader.onloadend = () => resolve(reader.result);
+            reader.readAsDataURL(memory.audioBlob);
+          });
+        }
+      } else {
+        // Fallback for demo when Firebase config is missing
+        const reader = new FileReader();
+        audioUrl = await new Promise((resolve) => {
+          reader.onloadend = () => resolve(reader.result);
+          reader.readAsDataURL(memory.audioBlob);
+        });
+      }
+    }
+
     const memoryToSave = {
       id: Date.now().toString(),
       title: encryptData(memory.title),
-      content: encryptData(memory.content),
+      content: memory.content ? encryptData(memory.content) : null,
       category: memory.category, // unencrypted for filtering
       date: new Date().toISOString(),
       timer: memory.timer || null,
       type: memory.type || 'text', // text, image, audio
       image: memory.image ? encryptData(memory.image) : null,
+      audioUrl: audioUrl ? encryptData(audioUrl) : null,
     };
     
+    // Store in Firestore if available
+    if (db && user) {
+      try {
+         await setDoc(doc(db, 'memories', memoryToSave.id), {
+           ...memoryToSave,
+           uid: user.uid
+         });
+      } catch (err) {
+         console.warn("Firestore error (likely missing config):", err);
+      }
+    }
+
     saveMemories([memoryToSave, ...memories]);
   };
 
@@ -51,8 +99,9 @@ export const useMemories = () => {
     return {
       ...memory,
       title: decryptData(memory.title) || 'Decryption Failed',
-      content: decryptData(memory.content) || '',
+      content: memory.content ? decryptData(memory.content) : '',
       image: memory.image ? decryptData(memory.image) : null,
+      audioUrl: memory.audioUrl ? decryptData(memory.audioUrl) : null,
     };
   };
 

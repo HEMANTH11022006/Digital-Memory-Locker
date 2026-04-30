@@ -5,6 +5,7 @@ import { useMemories } from '../hooks/useMemories';
 import { ArrowLeft, Trash2, Clock, Unlock, Lock } from 'lucide-react';
 import { format } from 'date-fns';
 import toast from 'react-hot-toast';
+import AudioPlayer from '../components/AudioPlayer';
 
 const MemoryDetail = () => {
   const { id } = useParams();
@@ -138,6 +139,12 @@ const MemoryDetail = () => {
               {decrypted?.image && (
                 <div className="mb-8 rounded-xl overflow-hidden border border-slate-700 bg-black/50">
                   <img src={decrypted.image} alt="Decrypted memory" className="max-w-full h-auto max-h-[60vh] object-contain mx-auto" />
+                </div>
+              )}
+
+              {decrypted?.audioUrl && (
+                <div className="mb-8">
+                  <AudioPlayer src={decrypted.audioUrl} />
                 </div>
               )}
 

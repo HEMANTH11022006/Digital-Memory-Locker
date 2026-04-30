@@ -2,8 +2,9 @@ import React, { useState, useRef } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { motion } from 'framer-motion';
 import { useMemories } from '../hooks/useMemories';
-import { ArrowLeft, Save, Image as ImageIcon, Mic, FileText, Clock, Lock } from 'lucide-react';
+import { ArrowLeft, Image as ImageIcon, Mic, FileText, Clock, Lock } from 'lucide-react';
 import toast from 'react-hot-toast';
+import AudioRecorder from '../components/AudioRecorder';
 
 const AddMemory = () => {
   const [title, setTitle] = useState('');
@@ -12,6 +13,8 @@ const AddMemory = () => {
   const [type, setType] = useState('text');
   const [timer, setTimer] = useState('');
   const [image, setImage] = useState(null);
+  const [audioBlob, setAudioBlob] = useState(null);
+  const [isUploading, setIsUploading] = useState(false);
 
   const { addMemory } = useMemories();
   const navigate = useNavigate();
@@ -28,26 +31,36 @@ const AddMemory = () => {
     }
   };
 
-  const handleSave = () => {
-    if (!title || (!content && !image)) {
-      toast.error('Title and content are required');
+  const handleSave = async () => {
+    if (!title || (!content && !image && !audioBlob)) {
+      toast.error('Title and some content (text/image/audio) are required');
       return;
     }
 
+    setIsUploading(true);
+    
     // Basic timer validation (minutes)
     const expiration = timer ? Date.now() + parseInt(timer) * 60000 : null;
 
-    addMemory({
-      title,
-      content,
-      category,
-      type,
-      timer: expiration,
-      image
-    });
+    try {
+      await addMemory({
+        title,
+        content,
+        category,
+        type,
+        timer: expiration,
+        image,
+        audioBlob
+      });
 
-    toast.success('Memory encrypted & saved');
-    navigate('/dashboard');
+      toast.success('Memory encrypted & saved');
+      navigate('/dashboard');
+    } catch (error) {
+      console.error('Error saving memory:', error);
+      toast.error('Failed to save memory');
+    } finally {
+      setIsUploading(false);
+    }
   };
 
   return (
@@ -87,14 +100,20 @@ const AddMemory = () => {
           >
             <ImageIcon className="w-4 h-4" /> <span>Image</span>
           </button>
-          {/* Audio feature would be similarly implemented using MediaRecorder API */}
           <button 
-            onClick={() => toast('Audio recording coming soon!', { icon: '🎙️' })}
+            onClick={() => setType('audio')}
             className={`flex items-center space-x-2 px-4 py-2 rounded-lg text-sm font-medium transition-colors ${type === 'audio' ? 'bg-indigo-500/20 text-indigo-400' : 'text-slate-400 hover:bg-slate-800'}`}
           >
             <Mic className="w-4 h-4" /> <span>Audio</span>
           </button>
         </div>
+
+        {type === 'audio' && (
+          <AudioRecorder 
+            onRecordingComplete={(blob) => setAudioBlob(blob)} 
+            onClear={() => setAudioBlob(null)} 
+          />
+        )}
 
         <input 
           type="file" 
@@ -157,10 +176,11 @@ const AddMemory = () => {
         <div className="pt-6 border-t border-slate-800 flex justify-end">
           <button
             onClick={handleSave}
-            className="flex items-center space-x-2 px-6 py-3 bg-indigo-600 hover:bg-indigo-500 text-white rounded-xl font-semibold transition-all shadow-lg shadow-indigo-500/20"
+            disabled={isUploading}
+            className="flex items-center space-x-2 px-6 py-3 bg-indigo-600 hover:bg-indigo-500 disabled:opacity-50 disabled:cursor-not-allowed text-white rounded-xl font-semibold transition-all shadow-lg shadow-indigo-500/20"
           >
             <Lock className="w-4 h-4" />
-            <span>Encrypt & Save</span>
+            <span>{isUploading ? 'Encrypting & Saving...' : 'Encrypt & Save'}</span>
           </button>
         </div>
       </motion.div>

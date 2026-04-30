@@ -4,6 +4,7 @@ import { format } from 'date-fns';
 import { Lock, Image as ImageIcon, Mic, FileText, Clock } from 'lucide-react';
 import { Link } from 'react-router-dom';
 import { useMemories } from '../hooks/useMemories';
+import AudioPlayer from './AudioPlayer';
 
 const TypeIcon = ({ type }) => {
   switch (type) {
@@ -45,10 +46,16 @@ const MemoryCard = ({ memory }) => {
           {decrypted.title || 'Untitled Memory'}
         </h3>
         
-        <p className="text-slate-400 text-sm line-clamp-2 mb-4">
-          {/* We show a locked preview instead of actual content for security on dashboard */}
-          Encrypted content. Tap to unlock and view.
-        </p>
+        {decrypted.audioUrl ? (
+          <div className="mb-4" onClick={(e) => e.preventDefault()}>
+            <AudioPlayer src={decrypted.audioUrl} minimal={true} />
+          </div>
+        ) : (
+          <p className="text-slate-400 text-sm line-clamp-2 mb-4">
+            {/* We show a locked preview instead of actual content for security on dashboard */}
+            Encrypted content. Tap to unlock and view.
+          </p>
+        )}
 
         <div className="flex items-center justify-between text-xs text-slate-500">
           <span className="flex items-center">
