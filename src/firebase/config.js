@@ -13,15 +13,21 @@ const firebaseConfig = {
 };
 
 // Initialize Firebase only if config is somewhat valid (to prevent immediate crash if not set up)
-let app, auth, db, storage;
+let app = null, auth = null, db = null, storage = null;
 
-try {
-  app = initializeApp(firebaseConfig);
-  auth = getAuth(app);
-  db = getFirestore(app);
-  storage = getStorage(app);
-} catch (error) {
-  console.warn("Firebase not properly configured. Please update config.js.");
+const isConfigured = firebaseConfig.apiKey && firebaseConfig.apiKey !== "YOUR_API_KEY";
+
+if (isConfigured) {
+  try {
+    app = initializeApp(firebaseConfig);
+    auth = getAuth(app);
+    db = getFirestore(app);
+    storage = getStorage(app);
+  } catch (error) {
+    console.warn("Firebase not properly configured. Please update config.js.");
+  }
+} else {
+  console.warn("Firebase config is using placeholder values. Using local storage mode only.");
 }
 
 export { auth, db, storage };
