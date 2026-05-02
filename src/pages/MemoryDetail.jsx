@@ -6,6 +6,7 @@ import { ArrowLeft, Trash2, Clock, Unlock, Lock } from 'lucide-react';
 import { format } from 'date-fns';
 import toast from 'react-hot-toast';
 import AudioPlayer from '../components/AudioPlayer';
+import { Download } from 'lucide-react';
 
 const MemoryDetail = () => {
   const { id } = useParams();
@@ -44,6 +45,88 @@ const MemoryDetail = () => {
 
     return () => clearTimeout(timer);
   }, [id, memories, navigate]);
+
+  const triggerDownload = (url, filename) => {
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = filename;
+    document.body.appendChild(a);
+    a.click();
+    document.body.removeChild(a);
+  };
+
+  const handleDownload = async (type, isEncrypted = false) => {
+    try {
+      let content = '';
+      let filename = '';
+      let mimeType = 'text/plain';
+
+      if (isEncrypted) {
+        if (type === 'text') {
+          content = memory.content;
+          filename = `encrypted_text_${memory.id}.txt`;
+        } else if (type === 'image') {
+          content = memory.image;
+          filename = `encrypted_image_${memory.id}.txt`;
+        } else if (type === 'audio') {
+          content = memory.audioUrl;
+          filename = `encrypted_audio_${memory.id}.txt`;
+        }
+        
+        if (!content) {
+          toast.error(`No ${type} data found.`);
+          return;
+        }
+
+        const blob = new Blob([content], { type: mimeType });
+        const url = URL.createObjectURL(blob);
+        triggerDownload(url, filename);
+        URL.revokeObjectURL(url);
+      } else {
+        if (type === 'text') {
+          content = decrypted?.content;
+          if (!content) {
+            toast.error('No text content found.');
+            return;
+          }
+          filename = `decrypted_text_${memory.id}.txt`;
+          const blob = new Blob([content], { type: mimeType });
+          const url = URL.createObjectURL(blob);
+          triggerDownload(url, filename);
+          URL.revokeObjectURL(url);
+        } else if (type === 'image') {
+          if (!decrypted?.image) {
+             toast.error('No image found.');
+             return;
+          }
+          filename = `image_${memory.id}.png`; 
+          triggerDownload(decrypted.image, filename);
+        } else if (type === 'audio') {
+          if (!decrypted?.audioUrl) {
+            toast.error('No audio found.');
+            return;
+          }
+          filename = `audio_${memory.id}.webm`;
+          if (decrypted.audioUrl.startsWith('http')) {
+            toast.loading('Downloading audio...', { id: 'download-audio' });
+            const response = await fetch(decrypted.audioUrl);
+            const blob = await response.blob();
+            const url = URL.createObjectURL(blob);
+            triggerDownload(url, filename);
+            URL.revokeObjectURL(url);
+            toast.success('Audio downloaded successfully', { id: 'download-audio' });
+            return;
+          } else {
+            triggerDownload(decrypted.audioUrl, filename);
+          }
+        }
+      }
+      toast.success(`${isEncrypted ? 'Encrypted ' : ''}${type} downloaded successfully`);
+    } catch (error) {
+      console.error('Download error:', error);
+      toast.error('Failed to download');
+    }
+  };
 
   if (isExpired) {
     return (
@@ -137,20 +220,48 @@ const MemoryDetail = () => {
               </h1>
 
               {decrypted?.image && (
-                <div className="mb-8 rounded-xl overflow-hidden border border-slate-700 bg-black/50">
+                <div className="mb-8 rounded-xl overflow-hidden border border-slate-700 bg-black/50 relative group">
                   <img src={decrypted.image} alt="Decrypted memory" className="max-w-full h-auto max-h-[60vh] object-contain mx-auto" />
+                  <div className="absolute top-4 right-4 flex flex-col gap-2 opacity-0 group-hover:opacity-100 transition-opacity">
+                    <button onClick={() => handleDownload('image', false)} className="p-2 bg-slate-900/80 rounded-lg hover:bg-slate-800 text-slate-300 hover:text-white transition-colors border border-slate-700 backdrop-blur-sm flex items-center gap-2 text-sm" title="Download Image">
+                      <Download className="w-4 h-4" /> <span>Image</span>
+                    </button>
+                    <button onClick={() => handleDownload('image', true)} className="p-2 bg-slate-900/80 rounded-lg hover:bg-slate-800 text-slate-300 hover:text-white transition-colors border border-slate-700 backdrop-blur-sm flex items-center gap-2 text-sm" title="Download Encrypted Data">
+                      <Lock className="w-4 h-4" /> <span>Encrypted</span>
+                    </button>
+                  </div>
                 </div>
               )}
 
               {decrypted?.audioUrl && (
-                <div className="mb-8">
+                <div className="mb-8 flex flex-col gap-3">
                   <AudioPlayer src={decrypted.audioUrl} />
+                  <div className="flex justify-end gap-3">
+                    <button onClick={() => handleDownload('audio', false)} className="px-3 py-1.5 bg-slate-800/50 rounded-lg hover:bg-slate-700 text-slate-400 hover:text-white transition-colors border border-slate-700/50 flex items-center gap-2 text-xs font-medium">
+                      <Download className="w-4 h-4" /> Download Audio
+                    </button>
+                    <button onClick={() => handleDownload('audio', true)} className="px-3 py-1.5 bg-slate-800/50 rounded-lg hover:bg-slate-700 text-slate-400 hover:text-white transition-colors border border-slate-700/50 flex items-center gap-2 text-xs font-medium">
+                      <Lock className="w-4 h-4" /> Download Encrypted
+                    </button>
+                  </div>
                 </div>
               )}
 
-              <div className="text-slate-300 text-lg leading-relaxed whitespace-pre-wrap">
-                {decrypted?.content}
-              </div>
+              {decrypted?.content && (
+                <div className="relative group">
+                  <div className="absolute top-0 right-0 flex gap-2 opacity-0 group-hover:opacity-100 transition-opacity -mt-2 -mr-2">
+                    <button onClick={() => handleDownload('text', false)} className="p-2 bg-slate-800/80 rounded-lg hover:bg-slate-700 text-slate-400 hover:text-white transition-colors border border-slate-700/50 flex items-center gap-2 text-xs font-medium" title="Download Text">
+                      <Download className="w-3.5 h-3.5" /> Text
+                    </button>
+                    <button onClick={() => handleDownload('text', true)} className="p-2 bg-slate-800/80 rounded-lg hover:bg-slate-700 text-slate-400 hover:text-white transition-colors border border-slate-700/50 flex items-center gap-2 text-xs font-medium" title="Download Encrypted Text">
+                      <Lock className="w-3.5 h-3.5" /> Encrypted
+                    </button>
+                  </div>
+                  <div className="text-slate-300 text-lg leading-relaxed whitespace-pre-wrap">
+                    {decrypted.content}
+                  </div>
+                </div>
+              )}
             </motion.div>
           )}
         </div>
